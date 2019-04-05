@@ -6,6 +6,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/uaccess.h>
 
 MODULE_LICENSE("Dual MIT/GPL");
 MODULE_AUTHOR("National Cheng Kung University, Taiwan");
@@ -17,7 +18,7 @@ MODULE_VERSION("0.1");
 /* MAX_LENGTH is set to 92 because
  * ssize_t can't fit the number > 92
  */
-#define MAX_LENGTH 92
+#define MAX_LENGTH 100
 
 static dev_t fib_dev = 0;
 static struct cdev *fib_cdev;
@@ -60,7 +61,16 @@ static ssize_t fib_read(struct file *file,
                         size_t size,
                         loff_t *offset)
 {
-    return (ssize_t) fib_sequence(*offset);
+    char buffer[100];
+    ktime_t t;
+    t = ktime_get();
+    unsigned long long result = fib_sequence(*offset);
+    t = ktime_sub(ktime_get(), t);
+    unsigned long long duration = (unsigned long long) ktime_to_ns(t);
+    sprintf(buffer, "%llu %llu", result, duration);
+    printk("%llu ns", duration);
+    copy_to_user(buf, buffer, 100 * sizeof(char));
+    return 0;
 }
 
 /* write operation is skipped */
