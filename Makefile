@@ -26,6 +26,8 @@ unload:
 
 client: client.c
 	$(CC) -o $@ $^
+plot:
+	gnuplot -p -c time.gp
 
 PRINTF = env printf
 PASS_COLOR = \e[32;01m
