@@ -9,7 +9,8 @@
 #define FIB_DEV "/dev/fibonacci"
 
 #define BILLION 1e9
-#define LOG_FILE "log.txt"
+#define MUSER "user.txt"
+#define MKERNEL "kernel.txt"
 
 struct timespec diff(struct timespec start, struct timespec end)
 {
@@ -33,7 +34,7 @@ int main()
     char write_buf[] = "testing writing";
     int offset = 100;  // TODO: test something bigger than the limit
     int i = 0;
-    FILE *fp = fopen(LOG_FILE, "w");
+    FILE *fp = fopen(MUSER, "w");
     char buffer[100];
     char kbuff[100];
 
@@ -51,7 +52,7 @@ int main()
         printf("Writing to " FIB_DEV ", returned the sequence %lld\n", sz);
     }
 
-    char *start = "N kernel_space_time(ns) user_space_time(sec)\n";
+    char *start = "N fib(N) kernel_space_time(ns) user_space_time(sec)\n";
     fwrite(start, sizeof(char), strlen(start), fp);
     for (i = 0; i <= offset; i++) {
         lseek(fd, i, SEEK_SET);
@@ -63,17 +64,9 @@ int main()
                "%lld.\n",
                i, sz);
         struct timespec tsec = diff(time1, time2);
-        sprintf(buffer, "%d %s %ld.%ld\n", i, kbuff, tsec.tv_sec, tsec.tv_nsec);
+        sprintf(buffer, "%d %s %f\n", i, kbuff,
+                tsec.tv_sec * BILLION + tsec.tv_nsec);
         fwrite(buffer, sizeof(char), strlen(buffer), fp);
-    }
-
-    for (i = offset; i >= 0; i--) {
-        lseek(fd, i, SEEK_SET);
-        sz = read(fd, buf, 1);
-        printf("Reading from " FIB_DEV
-               " at offset %d, returned the sequence "
-               "%lld.\n",
-               i, sz);
     }
 
     close(fd);
