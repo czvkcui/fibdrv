@@ -15,6 +15,9 @@ MODULE_VERSION("0.1");
 
 #define DEV_FIBONACCI_NAME "fibonacci"
 
+typedef unsigned long long ulint;
+#define MOD 1000000007;
+
 /* MAX_LENGTH is set to 92 because
  * ssize_t can't fit the number > 92
  */
@@ -25,10 +28,10 @@ static struct cdev *fib_cdev;
 static struct class *fib_class;
 static DEFINE_MUTEX(fib_mutex);
 
-static long long fib_sequence(long long k)
+static ulint fib_sequence(long long k)
 {
     /* FIXME: use clz/ctz and fast algorithms to speed up */
-    long long f[k + 2];
+    unsigned long long f[k + 2];
 
     f[0] = 0;
     f[1] = 1;
@@ -38,6 +41,91 @@ static long long fib_sequence(long long k)
     }
 
     return f[k];
+}
+
+void matrix_multiply(ulint F[2][2], ulint M[2][2]);
+void matrix_power(ulint F[2][2], long long n);
+
+void multiply(ulint F[2][2], ulint M[2][2])
+{
+    int x = F[0][0] * M[0][0] + F[0][1] * M[1][0];
+    int y = F[0][0] * M[0][1] + F[0][1] * M[1][1];
+    int z = F[1][0] * M[0][0] + F[1][1] * M[1][0];
+    int w = F[1][0] * M[0][1] + F[1][1] * M[1][1];
+
+    F[0][0] = x;
+    F[0][1] = y;
+    F[1][0] = z;
+    F[1][1] = w;
+}
+
+void power(ulint F[2][2], int n)
+{
+    if (n == 0 || n == 1)
+        return;
+    ulint M[2][2] = {{1, 1}, {1, 0}};
+
+    power(F, n / 2);
+    multiply(F, F);
+
+    if (n % 2 != 0)
+        multiply(F, M);
+}
+
+static ulint fib_seq_matrix_exponentation(long long k)
+{
+    ulint F[2][2] = {{1, 1}, {1, 0}};
+    if (k == 0)
+        return 0;
+    power(F, k - 1);
+
+    return F[0][0];
+}
+
+static ulint fast_fib(long long k, long long int ans[2])
+{
+    long long int a, b, c, d;
+    if (k == 0) {
+        ans[0] = 0;
+        ans[1] = 1;
+        return;
+    }
+    fast_fib((k / 2), ans);
+    a = ans[0]; /* F(n) */
+    b = ans[1]; /* F(n+1) */
+    c = 2 * b - a;
+    if (c < 0)
+        c += MOD;
+    c = (a * c) % MOD;         /* F(2n) */
+    d = (a * a + b * b) % MOD; /* F(2n + 1) */
+    if (k % 2 == 0) {
+        ans[0] = c;
+        ans[1] = d;
+    } else {
+        ans[0] = d;
+        ans[1] = c + d;
+    }
+}
+
+static ulint fib_double_fib_identities(long long k)
+{
+    if (k <= 0)
+        return 0;
+
+    long long t = 1 << (63 - __builtin_clz(k)) >>
+                  1;  // the first index of leading 1 minus one
+    long long a = 1;  // f(i)
+    long long b = 1;  // f(i+1)
+
+    for (; t; t >>= 1) {
+        long long _a = a * (2 * b - a);  // f(2i) = f(i) * (2f(i+1) - f(i))
+        long long _b =
+            a * a + b * b;  // f(2i+1) = f(i) * f(i) + f(i+1) * f(i+1)
+        a = (k & t) ? _b : _a;
+        b = (k & t) ? _b + _a : _b;
+    }
+
+    return a;
 }
 
 static int fib_open(struct inode *inode, struct file *file)
@@ -63,8 +151,9 @@ static ssize_t fib_read(struct file *file,
 {
     char buffer[100];
     ktime_t t;
+    long long int ans[2] = {0};
     t = ktime_get();
-    unsigned long long result = fib_sequence(*offset);
+    unsigned long long result = fast_fib(*offset, ans);
     t = ktime_sub(ktime_get(), t);
     unsigned long long duration = (unsigned long long) ktime_to_ns(t);
     sprintf(buffer, "%llu %llu", result, duration);
