@@ -26,7 +26,12 @@ unload:
 
 client: client.c
 	$(CC) -o $@ $^
-plot:
+
+plot: all
+	$(MAKE) unload
+	$(MAKE) load
+	sudo ./client > out
+	$(MAKE) unload
 	gnuplot -p -c time.gp
 
 PRINTF = env printf
